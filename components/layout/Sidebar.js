@@ -43,8 +43,9 @@ export default function Sidebar() {
 
   return (
     <aside style={{
-      width: 220, minHeight: "100vh", background: "var(--dark-900)",
-      display: "flex", flexDirection: "column", flexShrink: 0,
+      position: "fixed", top: 0, left: 0, bottom: 0,
+      width: 220, overflowY: "auto", background: "var(--dark-900)",
+      display: "flex", flexDirection: "column", zIndex: 100,
     }}>
       {/* Logo */}
       <div style={{ padding: "22px 20px 18px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>

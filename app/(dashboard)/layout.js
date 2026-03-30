@@ -33,9 +33,9 @@ export default function DashboardLayout({ children }) {
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
+    <div style={{ display: "block" }}>
       <Sidebar />
-      <main style={{ flex: 1, overflow: "auto", background: "var(--gray-50)" }}>
+      <main style={{ marginLeft: 220, minHeight: "100vh", background: "var(--gray-50)" }}>
         {children}
       </main>
     </div>

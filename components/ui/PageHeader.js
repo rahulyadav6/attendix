@@ -1,6 +1,7 @@
 export default function PageHeader({ title, subtitle, children }) {
   return (
     <div style={{
+      position: "sticky", top: 0, zIndex: 50,
       background: "#fff", borderBottom: "1px solid var(--gray-200)",
       padding: "0 28px", height: 58,
       display: "flex", alignItems: "center", justifyContent: "space-between",

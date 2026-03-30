@@ -21,9 +21,9 @@ export default function StudentDashboardLayout({ children }) {
   ];
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'DM Sans', system-ui, sans-serif", background: "var(--gray-50)" }}>
+    <div style={{ display: "block", fontFamily: "'DM Sans', system-ui, sans-serif", background: "var(--gray-50)" }}>
       {/* Sidebar */}
-      <aside style={{ width: 220, background: "#fff", borderRight: "1px solid var(--gray-200)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+      <aside style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: 220, overflowY: "auto", background: "#fff", borderRight: "1px solid var(--gray-200)", display: "flex", flexDirection: "column", zIndex: 100 }}>
         {/* Logo */}
         <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid var(--gray-100)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -83,7 +83,7 @@ export default function StudentDashboardLayout({ children }) {
       </aside>
 
       {/* Main content */}
-      <main style={{ flex: 1, overflow: "auto" }}>
+      <main style={{ marginLeft: 220, minHeight: "100vh" }}>
         {children}
       </main>
     </div>
