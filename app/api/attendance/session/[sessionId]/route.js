@@ -38,5 +38,15 @@ export const DELETE = withAuth(async (request, { params }) => {
   // Delete the session itself
   await QRSession.deleteOne({ _id: params.sessionId });
 
+  // Broadcast session_ended so students see the QR disappear immediately
+  try {
+    const { getIO } = await import("@/lib/socket");
+    const io = getIO();
+    if (io) {
+      io.to(`section:${session.sectionId}`).emit("session_ended", { sectionId: session.sectionId });
+      io.to(session.sectionId.toString()).emit("session_ended", { sectionId: session.sectionId });
+    }
+  } catch (e) {}
+
   return NextResponse.json({ success: true, message: "Session and related attendance records deleted" });
 });

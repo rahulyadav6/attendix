@@ -32,9 +32,21 @@ export default function StudentDashboard() {
         const socket = io({ path: "/api/socket" });
         socketRef.current = socket;
 
-        res.data.student.sections.forEach(sec => {
-          socket.emit("join_section", sec._id);
-        });
+        const studentId = res.data.student.studentId;
+        const sectionIds = res.data.student.sections.map(s => s._id);
+
+        // CRITICAL: Wait for socket to actually connect before joining rooms
+        // Emitting before 'connect' fires causes events to be silently dropped
+        function joinRooms() {
+          socket.emit("join_student", studentId);
+          sectionIds.forEach(id => socket.emit("join_section", id));
+        }
+
+        if (socket.connected) {
+          joinRooms();
+        } else {
+          socket.once("connect", joinRooms);
+        }
 
         // Load active session (if any)
         try {
@@ -42,7 +54,7 @@ export default function StudentDashboard() {
           if (sessionRes.data.session) {
             setActiveSession({
               ...sessionRes.data.session,
-              sessionToken: sessionRes.data.session.token, // Map for existing modal logic
+              sessionToken: sessionRes.data.session.token,
             });
           }
         } catch (err) {
@@ -60,6 +72,36 @@ export default function StudentDashboard() {
         socket.on("session_ended", () => {
           setActiveSession(null);
         });
+
+        socket.on("section_added", ({ sectionId, sectionName }) => {
+          // Refresh full student data to get updated sections with stats
+          api.get("/student/me").then(r => {
+            setData(r.data.student);
+            // Also join the new section's socket room
+            socket.emit("join_section", sectionId);
+          }).catch(() => {});
+          toast.success(`You have been added to "${sectionName || "a new section"}"!`, { duration: 5000 });
+        });
+
+        socket.on("section_removed", ({ sectionId }) => {
+          setData(prev => {
+            if (!prev) return prev;
+            return { ...prev, sections: prev.sections.filter(s => s._id !== sectionId) };
+          });
+          setActiveSession(prev => {
+            if (!prev) return null;
+            if (prev.sectionId === sectionId) return null;
+            return prev;
+          });
+          toast("A section was removed by your teacher.", { icon: "📚" });
+        });
+
+        socket.on("attendance_updated", () => {
+          // Refresh today's attendance and section stats
+          api.get("/student/attendance/today").then(r => setTodayAtt(r.data.attendance || [])).catch(() => {});
+          api.get("/student/me").then(r => setData(r.data.student)).catch(() => {});
+        });
+
       } catch (err) {
         if (err.response?.status === 401) logout();
       } finally {

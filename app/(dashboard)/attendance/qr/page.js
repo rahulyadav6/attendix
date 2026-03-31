@@ -52,7 +52,13 @@ export default function QRAttendancePage() {
 
   useEffect(() => {
     if (socketRef.current && sectionId) {
-      socketRef.current.emit("join_section", sectionId);
+      if (socketRef.current.connected) {
+        socketRef.current.emit("join_section", sectionId);
+      } else {
+        socketRef.current.once("connect", () => {
+          socketRef.current.emit("join_section", sectionId);
+        });
+      }
     }
   }, [sectionId]);
 
@@ -70,11 +76,16 @@ export default function QRAttendancePage() {
       return;
     }
     const expiry = new Date(session.expiresAt).getTime();
+    const secId = session.sectionId || sectionId;
     timerRef.current = setInterval(() => {
       const left = Math.max(0, Math.round((expiry - Date.now()) / 1000));
       setTimeLeft(left);
       if (left <= 0) {
         clearInterval(timerRef.current);
+        // Notify students that the session has expired
+        if (socketRef.current) {
+          socketRef.current.emit("end_session", { sectionId: secId });
+        }
         setSession(null);
         setQrUrl("");
         toast("QR session expired", { icon: "⏱" });

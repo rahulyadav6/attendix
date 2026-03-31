@@ -57,6 +57,20 @@ export const POST = withAuth(async (request) => {
     }
 
     await student.populate("sectionIds", "name");
+
+    // Notify the student's browser in real-time if they are connected
+    try {
+      const { getIO } = await import("@/lib/socket");
+      const io = getIO();
+      if (io && sectionId) {
+        // Emit to a room keyed by studentId string (e.g. "student:100")
+        io.to(`student:${student.studentId}`).emit("section_added", {
+          sectionId,
+          sectionName: student.sectionIds.find(s => s._id.toString() === sectionId)?.name,
+        });
+      }
+    } catch (e) {}
+
     return NextResponse.json({ student }, { status: 201 });
   } catch (err) {
     if (err.name === 'ValidationError') {

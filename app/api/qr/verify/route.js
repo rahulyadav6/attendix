@@ -60,6 +60,7 @@ export async function POST(request) {
     const { getIO } = await import("@/lib/socket");
     const io = getIO();
     if (io) {
+      // Notify teacher dashboard of scan
       io.to(`section:${session.sectionId}`).emit("attendance_scanned", {
         studentId: student,
         markedAt: new Date().toISOString(),
@@ -68,6 +69,8 @@ export async function POST(request) {
         studentId: student,
         markedAt: new Date().toISOString(),
       });
+      // Notify the student's own browser so their stats refresh
+      io.to(`student:${student.studentId}`).emit("attendance_updated");
     }
   } catch (e) {
     console.error("Socket emit failed", e);

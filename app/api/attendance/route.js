@@ -48,6 +48,16 @@ export const POST = withAuth(async (request) => {
   try {
     const record = await Attendance.create({ studentId, sectionId, teacherId, date, status, method });
     await record.populate("studentId", "name studentId");
+
+    // Notify the student's browser so their stats refresh in real-time
+    try {
+      const { getIO } = await import("@/lib/socket");
+      const io = getIO();
+      if (io && record.studentId?.studentId) {
+        io.to(`student:${record.studentId.studentId}`).emit("attendance_updated");
+      }
+    } catch (e) {}
+
     return NextResponse.json({ record }, { status: 201 });
   } catch (err) {
     if (err.code === 11000) {

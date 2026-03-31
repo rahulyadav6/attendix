@@ -52,5 +52,27 @@ export const PUT = withAuth(async (request, { params }) => {
     await Student.bulkWrite(bulkOps);
   }
 
+  // Notify affected students via socket
+  try {
+    const { getIO } = await import("@/lib/socket");
+    const io = getIO();
+    if (io) {
+      for (const student of allStudents) {
+        const shouldBeInSection = studentIds.includes(student._id.toString());
+        const wasInSection = student.sectionIds.map(id => id.toString()).includes(sectionId);
+        if (shouldBeInSection && !wasInSection) {
+          // Student was just added — tell their browser
+          io.to(`student:${student.studentId}`).emit("section_added", {
+            sectionId,
+            sectionName: section.name,
+          });
+        } else if (!shouldBeInSection && wasInSection) {
+          // Student was removed — tell their browser
+          io.to(`student:${student.studentId}`).emit("section_removed", { sectionId });
+        }
+      }
+    }
+  } catch (e) {}
+
   return NextResponse.json({ message: "Students updated successfully" });
 });

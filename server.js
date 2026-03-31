@@ -41,6 +41,11 @@ app.prepare().then(() => {
       socket.join(sectionId);
     });
 
+    // Students join a personal room so server can target them by studentId
+    socket.on('join_student', (studentId) => {
+      socket.join(`student:${studentId}`);
+    });
+
     // Teacher broadcasts a new QR session
     socket.on('new_session', (data) => {
       io.to(`section:${data.sectionId}`).emit('session_started', data);
@@ -49,6 +54,7 @@ app.prepare().then(() => {
 
     socket.on('end_session', (data) => {
       io.to(`section:${data.sectionId}`).emit('session_ended', data);
+      io.to(data.sectionId).emit('session_ended', data);
     });
 
     socket.on('disconnect', () => {});

@@ -42,6 +42,18 @@ export const DELETE = withAuth(async (request, { params }) => {
     
     await section.deleteOne();
 
+    // Broadcast to all students in this section: section is gone + any active QR session is ended
+    try {
+      const { getIO } = await import("@/lib/socket");
+      const io = getIO();
+      if (io) {
+        io.to(`section:${params.id}`).emit("session_ended", { sectionId: params.id });
+        io.to(`section:${params.id}`).emit("section_removed", { sectionId: params.id });
+        io.to(params.id).emit("session_ended", { sectionId: params.id });
+        io.to(params.id).emit("section_removed", { sectionId: params.id });
+      }
+    } catch (e) {}
+
     return NextResponse.json({ message: "Section deleted successfully" });
   } catch (error) {
     console.error("Delete section error:", error);
