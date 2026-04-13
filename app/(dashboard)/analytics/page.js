@@ -159,6 +159,24 @@ export default function AnalyticsPage() {
           <div style={{ display: "flex", justifyContent: "center", paddingTop: 60 }}><Spinner /></div>
         ) : !data ? null : (
           <>
+            {/* At-Risk Alert */}
+            {data.summary.lowAttendanceCount > 0 && (
+              <div style={{
+                background: "#FCEBEB", border: "1px solid #F7C1C1", borderRadius: 12,
+                padding: "14px 20px", marginBottom: 22, display: "flex", alignItems: "center", gap: 16
+              }}>
+                <div style={{ fontSize: 24 }}>⚠️</div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#791F1F" }}>
+                    Attendance Alert: {data.summary.lowAttendanceCount} students at risk
+                  </div>
+                  <div style={{ fontSize: 13, color: "#A32D2D", marginTop: 2 }}>
+                    The following students have fallen below the 75% attendance threshold. Immediate follow-up is recommended.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Stat cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 14, marginBottom: 22 }}>
               <StatCard label="Total students"    value={data.summary.totalStudents} />
@@ -317,6 +335,40 @@ export default function AnalyticsPage() {
                 </table>
               </div>
             </Card>
+
+            {/* Face Recognition Registry */}
+            <div style={{ marginTop: 24 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--gray-900)", marginBottom: 14 }}>
+                Biometric Registry
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
+                {data.studentStats.map((s) => (
+                  <Card key={s._id} style={{ padding: 10, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+                    <div style={{ position: "relative", marginBottom: 10 }}>
+                      {s.photo ? (
+                        <img src={s.photo} alt="" style={{ width: 64, height: 64, borderRadius: 12, objectFit: "cover", border: "2px solid var(--gray-100)" }} />
+                      ) : (
+                        <div style={{ width: 64, height: 64, borderRadius: 12, background: "var(--gray-50)", display: "flex", alignItems: "center", justifyContent: "center", border: "2px dashed var(--gray-200)" }}>
+                          <span style={{ fontSize: 20 }}>👤</span>
+                        </div>
+                      )}
+                      <div style={{
+                        position: "absolute", bottom: -4, right: -4, width: 18, height: 18,
+                        borderRadius: "50%", background: "#fff", border: "1px solid var(--gray-100)",
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10
+                      }}>
+                        {s.byMethod.face > 0 ? "✅" : "❌"}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--gray-900)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%" }}>{s.name}</div>
+                    <div style={{ fontSize: 10, color: "var(--gray-400)", fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{s.studentId}</div>
+                    <div style={{ marginTop: 6, fontSize: 10, fontWeight: 500, color: s.byMethod.face > 0 ? "var(--teal-600)" : "var(--gray-400)" }}>
+                      {s.byMethod.face > 0 ? `${s.byMethod.face} face marks` : "No face data"}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
           </>
         )}
       </div>

@@ -55,11 +55,46 @@ export async function GET(request) {
         email: student.email,
         studentId: student.studentId,
         isBlocked: student.isBlocked,
+        photo: student.photo,
         sections: sectionsWithStats,
       }
     });
   } catch (err) {
     console.error("Student profile error:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
+export async function PUT(request) {
+  try {
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (decoded.role !== "student") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await connectDB();
+    const { name } = await request.json();
+    const student = await Student.findById(decoded.id);
+    if (!student) return NextResponse.json({ error: "Student not found" }, { status: 404 });
+
+    if (name) student.name = name;
+    // Disallow photo updates from student side to prevent scams
+    
+    await student.save();
+
+    return NextResponse.json({ 
+      message: "Profile updated", 
+      student: { name: student.name, photo: student.photo } 
+    });
+  } catch (err) {
+    console.error("Student profile update error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

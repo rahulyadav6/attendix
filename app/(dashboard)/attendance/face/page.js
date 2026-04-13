@@ -60,6 +60,16 @@ export default function FaceAttendancePage() {
     }
   }, []);
 
+  // Cleanup hardware lock when leaving scanner page
+  useEffect(() => {
+    return () => {
+      clearInterval(intervalRef.current);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, []);
+
   async function startCamera() {
     if (!sectionId)  { toast.error("Select a section first"); return; }
     const trained = students.filter((s) => s.descriptor?.length === 128);
@@ -72,13 +82,25 @@ export default function FaceAttendancePage() {
     if (!ok) return;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter(d => d.kind === "videoinput");
+      if (cameras.length === 0) {
+        toast.error("Your browser cannot find ANY physical webcams connected. Please check Windows camera privacy settings.");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
       setActive(true);
       startDetection();
-    } catch {
-      toast.error("Camera access denied. Please allow camera permissions.");
+    } catch (err) {
+      console.error("Camera error:", err);
+      if (!navigator.mediaDevices) {
+        toast.error("Camera blocked. If you are on a phone/different computer, you MUST use HTTPS or localhost.");
+      } else {
+        toast.error(`Camera error: ${err.message || "Access denied"}`);
+      }
     }
   }
 

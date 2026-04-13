@@ -28,19 +28,20 @@ export default function FaceTrainer({ student, onTrained }) {
         ]);
       }
 
-      // Create image element from base64
+      // Create image element from base64 or URL
       const img = new Image();
+      img.crossOrigin = "anonymous"; // Needed for Cloudinary URLs
       img.src = student.photo;
       await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
 
       // Detect face + get descriptor
       const detection = await faceapi
-        .detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
+        .detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
 
       if (!detection) {
-        toast.error("No face detected in the photo. Use a clear front-facing photo.");
+        toast.error("Low confidence: No face detected. Please ensure bright lighting and look straight at the camera.");
         setStatus("error");
         return;
       }
@@ -54,7 +55,7 @@ export default function FaceTrainer({ student, onTrained }) {
       if (onTrained) onTrained(student._id);
     } catch (err) {
       console.error("Training error:", err);
-      toast.error("Face training failed. Check photo quality.");
+      toast.error(`Error: ${err.message || "Face training failed"}`);
       setStatus("error");
     }
   }

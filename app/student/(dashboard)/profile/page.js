@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import toast from "react-hot-toast";
@@ -8,9 +8,32 @@ export default function StudentProfile() {
   const { student } = useAuth();
   const [form, setForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [saving, setSaving] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [profileForm, setProfileForm] = useState({ name: student?.name || "" });
-  const [profileSaving, setProfileSaving] = useState(false);
+  const [livePhoto, setLivePhoto] = useState(student?.photo || "");
+
+  useEffect(() => {
+    // Always fetch the freshest profile data from the server directly
+    api.get("/student/me").then(({ data }) => {
+      if (data?.student?.photo) {
+        setLivePhoto(data.student.photo);
+      }
+    }).catch(err => console.error(err));
+
+    let socket;
+    import('socket.io-client').then(({ io }) => {
+      socket = io(process.env.NEXT_PUBLIC_APP_URL || "", { path: "/api/socket" });
+      if (student?._id) {
+        socket.emit("join_student", student._id);
+      }
+      socket.on("profile_updated", (data) => {
+        if (data.photo) setLivePhoto(data.photo);
+      });
+    });
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [student?._id]);
+
 
   async function handleChangePassword(e) {
     e.preventDefault();
@@ -33,6 +56,7 @@ export default function StudentProfile() {
     } finally { setSaving(false); }
   }
 
+
   const initials = (name) => name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
 
   return (
@@ -43,9 +67,13 @@ export default function StudentProfile() {
       {/* Profile Card */}
       <div style={{ background: "#fff", borderRadius: 14, border: "1px solid var(--gray-200)", padding: "24px", marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
-          <div style={{ width: 64, height: 64, borderRadius: 16, background: "var(--teal-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: "var(--teal-800)", flexShrink: 0 }}>
-            {initials(student?.name)}
-          </div>
+          {livePhoto ? (
+            <img src={livePhoto} alt="" style={{ width: 70, height: 70, borderRadius: 20, objectFit: "cover", border: "3px solid var(--teal-50)" }} />
+          ) : (
+            <div style={{ width: 70, height: 70, borderRadius: 20, background: "var(--teal-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 700, color: "var(--teal-800)", border: "3px solid var(--teal-50)" }}>
+              {initials(student?.name)}
+            </div>
+          )}
           <div>
             <div style={{ fontSize: 20, fontWeight: 600, color: "var(--gray-900)" }}>{student?.name}</div>
             <div style={{ fontSize: 12, color: "var(--gray-400)", fontFamily: "'DM Mono', monospace", marginTop: 3 }}>

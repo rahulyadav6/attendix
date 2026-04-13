@@ -25,6 +25,8 @@ function StudentsContent() {
   const [newPw,       setNewPw]       = useState("");
   const [pwSaving,    setPwSaving]    = useState(false);
   const [form, setForm] = useState({ name: "", studentId: "", email: "", password: "", photo: "" });
+  const [webcam, setWebcam] = useState(false);
+  const videoRef = useRef(null);
   const fileRef = useRef(null);
 
   const displayedStudents = students
@@ -61,6 +63,82 @@ function StudentsContent() {
     reader.readAsDataURL(file);
   }
 
+  const streamRef = useRef(null);
+
+  async function startWebcam() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      streamRef.current = stream;
+      setWebcam(true);
+    } catch (err) {
+      toast.error("Could not access camera: " + err.message);
+      setWebcam(false);
+    }
+  }
+
+  function stopWebcam() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setWebcam(false);
+  }
+
+  // Hook to attach stream automatically when video mounts
+  useEffect(() => {
+    if (webcam && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [webcam]);
+
+  // Cleanup webcam stream when navigating away or closing modal
+  useEffect(() => {
+    if (!modal && webcam) {
+      stopWebcam();
+    }
+  }, [modal, webcam]);
+
+  useEffect(() => {
+    return () => {
+      // Only stop webcam on unmount, not on every state change!
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+      }
+    };
+  }, []);
+
+  function capturePhoto() {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0) {
+      toast.error("Camera still initializing. Please wait a second.");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    // Resize for efficiency (max width 640)
+    const scale = Math.min(640 / video.videoWidth, 1);
+    canvas.width = video.videoWidth * scale;
+    canvas.height = video.videoHeight * scale;
+    
+    // Draw and capture with high compression
+    const ctx = canvas.getContext("2d");
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        // Just flipped context in case it's mirrored horizontally
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // Reset transform before converting to base64
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const base64 = canvas.toDataURL("image/jpeg", 0.7);
+    
+    setForm({ ...form, photo: base64 });
+    stopWebcam();
+  }
+
   async function handleAdd() {
     if (!form.name.trim() || !form.studentId.trim() || !form.email.trim()) {
       toast.error("Name, ID, and Email are required"); return;
@@ -68,22 +146,37 @@ function StudentsContent() {
     if (!editingId && !form.password.trim()) {
       toast.error("Password is required for new students"); return;
     }
+
+    // Force close camera if it's still open
+    if (webcam) {
+      stopWebcam();
+    }
+
     setSaving(true);
+    let photoUrl = form.photo;
     try {
+      // If photo is a base64 string, upload to Cloudinary first
+      if (form.photo && form.photo.startsWith("data:image")) {
+        toast.loading("Uploading photo...", { id: "upload" });
+        const { data } = await api.post("/upload", { image: form.photo });
+        photoUrl = data.url;
+        toast.success("Photo uploaded to cloud", { id: "upload" });
+      }
+
       if (editingId) {
-        const payload = { ...form };
+        const payload = { ...form, photo: photoUrl };
         if (!payload.password) delete payload.password;
         await api.put(`/students/${editingId}`, payload);
         toast.success("Student updated");
       } else {
-        await api.post("/students", form);
+        await api.post("/students", { ...form, photo: photoUrl });
         toast.success("Student added");
       }
       setModal(false); setEditingId(null);
       setForm({ name: "", studentId: "", email: "", password: "", photo: "" });
       load();
     } catch (err) {
-      toast.error(err.response?.data?.error || "Failed to save student");
+      toast.error(err.response?.data?.error || "Failed to save student", { id: "upload" });
     } finally { setSaving(false); }
   }
 
@@ -180,7 +273,7 @@ function StudentsContent() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--gray-100)" }}>
-                  {["Student", "ID", "Email", "Sections", "Status", "Actions"].map((h) => (
+                  {["Student", "ID", "Email", "Sections", "Status", "Face Data", "Actions"].map((h) => (
                     <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontSize: 10, fontFamily: "'DM Mono', monospace", color: "var(--gray-400)", letterSpacing: "0.05em", fontWeight: 500, textTransform: "uppercase" }}>{h}</th>
                   ))}
                 </tr>
@@ -218,6 +311,9 @@ function StudentsContent() {
                         : <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 5, background: "var(--teal-50)", color: "var(--teal-700)", fontWeight: 500 }}>Active</span>}
                     </td>
                     <td style={{ padding: "12px 16px" }}>
+                      <FaceTrainer student={s} onTrained={load} />
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
                       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                         <button onClick={() => openEdit(s)} style={btnStyle("var(--teal-50)","var(--teal-200)","var(--teal-700)")}>Edit</button>
                         <button onClick={() => { setPwModal(s); setNewPw(""); }} style={btnStyle("#EFF6FF","#BFDBFE","#1D4ED8")}>Reset PW</button>
@@ -237,20 +333,32 @@ function StudentsContent() {
 
       {/* Add / Edit Student Modal */}
       <Modal open={modal} onClose={() => { setModal(false); setEditingId(null); }} title={editingId ? "Edit student" : "Add student"}>
-        <Input label="Full name" placeholder="Ahmed Awais" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <Input label="Full name" placeholder="Keshav Yadav" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <Input label="Student ID (unique)" placeholder="BSCS-001" value={form.studentId} onChange={(e) => setForm({ ...form, studentId: e.target.value })} />
-        <Input label="Email Address (unique)" placeholder="student@school.edu" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <Input label="Email Address (unique)" placeholder="student@gmail.edu" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         <Input label={editingId ? "Reset Password (leave blank to keep current)" : "Password"} placeholder={editingId ? "Leave empty to keep current" : "••••••••"} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--gray-700)", marginBottom: 6 }}>Photo (for face recognition)</label>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {form.photo && <img src={form.photo} alt="preview" style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover" }} />}
-            <button onClick={() => fileRef.current?.click()} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--gray-200)", background: "var(--gray-50)", color: "var(--gray-700)", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-              {form.photo ? "Change photo" : "Upload photo"}
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhoto} />
-            {!form.photo && <span style={{ fontSize: 11, color: "var(--gray-400)" }}>JPG/PNG, max 2MB</span>}
-          </div>
+          {webcam ? (
+            <div style={{ position: "relative", width: 220, margin: "10px 0" }}>
+              <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: 160, borderRadius: 10, objectFit: "cover", background: "#000" }} />
+              <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                <button onClick={capturePhoto} style={{ flex: 1, padding: "7px", background: "var(--teal-400)", color: "#fff", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>Capture</button>
+                <button onClick={stopWebcam} style={{ padding: "7px", background: "var(--gray-100)", color: "var(--gray-600)", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Close</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {form.photo && <img src={form.photo} alt="preview" style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover", border: "1px solid var(--gray-100)" }} />}
+              <button onClick={() => fileRef.current?.click()} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--gray-200)", background: "var(--gray-50)", color: "var(--gray-700)", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+                {form.photo ? "Change" : "Upload"}
+              </button>
+              <button onClick={startWebcam} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid var(--teal-100)", background: "var(--teal-50)", color: "var(--teal-700)", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+                📸 Take Live
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhoto} />
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
           <Button variant="ghost" onClick={() => { setModal(false); setEditingId(null); }}>Cancel</Button>

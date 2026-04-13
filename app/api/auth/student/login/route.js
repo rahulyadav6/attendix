@@ -37,7 +37,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       token,
-      student: { id: student._id, name: student.name, email: student.email, studentId: student.studentId },
+      student: { id: student._id, name: student.name, email: student.email, studentId: student.studentId, photo: student.photo },
     });
   } catch (err) {
     console.error("Student login error:", err);

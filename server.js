@@ -4,7 +4,9 @@ const next = require('next');
 const { Server } = require('socket.io');
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
+const hostname = '0.0.0.0';
+// const dev = process.env.NODE_ENV !== 'production';
+// const hostname = dev ? 'localhost' : '0.0.0.0';
 const port = parseInt(process.env.PORT || '3000', 10);
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -27,7 +29,11 @@ app.prepare().then(() => {
 
   const io = new Server(server, {
     path: "/api/socket",
-    cors: { origin: "*" }
+    cors: {
+      origin: process.env.NEXT_PUBLIC_APP_URL || "*",
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
   });
 
   // Store globally so API routes can emit events
@@ -57,7 +63,7 @@ app.prepare().then(() => {
       io.to(data.sectionId).emit('session_ended', data);
     });
 
-    socket.on('disconnect', () => {});
+    socket.on('disconnect', () => { });
   });
 
   server.once('error', (err) => {
@@ -65,7 +71,7 @@ app.prepare().then(() => {
     process.exit(1);
   });
 
-  server.listen(port, () => {
+  server.listen(port, hostname, () => {
     console.log(`> AttendIQ ready on http://${hostname}:${port}`);
   });
 });

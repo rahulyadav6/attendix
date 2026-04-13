@@ -34,6 +34,10 @@ export const PUT = withAuth(async (request, { params }) => {
     await student.save();
     await student.populate("sectionIds", "name");
 
+    if (global.__io) {
+      global.__io.to(`student:${student._id}`).emit("profile_updated", { photo: student.photo, name: student.name });
+    }
+
     return NextResponse.json({ student });
   } catch (err) {
     if (err.name === 'ValidationError') {
